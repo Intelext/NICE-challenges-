@@ -1,0 +1,32 @@
+Heartbleed is a bug in the OpenSSL library that allows someone to retrieve the contents of memory from a vulnerable system. This bug was caused by a lack of bounds-checking on the heartbeat sent by a client to keep a connection alive and can be exploited by modifying the packet sent to have an arbitrary length. This can cause sensitive data, such as email, passwords, and certificates, to be leaked and stolen without a trace.
+
+Mechanics: 
+Heartbleed takes advantage of the lack of bounds-checking in the heartbeat packet to retrieve data in the OpenSSL memory buffer. A heartbeat consists of a type, a payload length, a payload, and arbitrary padding. When the payload length parameter is increased, instead of checking the boundary, memory from near the heartbeat request would be sent back, causing this data leak. An update to OpenSSL corrects this problem on all major Linux distributions.
+
+Example: This example demonstrates the severity of Heartbleed on Dev-Web.
+
+1. Log in to the Workstation-Desk VM and open a web browser.
+
+Navigate to the website currently being hosted on the Dev-Web VM by entering the following URL...
+https://devweb.daswebs.com:8443
+
+This web application has a login screen that protects user information. Note that the web server is using a self-signed certificate, which will need to be accepted before you can access the application. Try logging in with the username "admin" and the password "admin123". Review the web page you are sent after you have logged in.
+
+2. Log in to the Security-Desk VM as the "playerone" user and open a terminal. Run the following command within playerone's home directory (/home/playerone)...
+python2 heartbleed.py test devweb.daswebs.com
+
+Some output will be displayed and towards the end it should state that the server is vulnerable.
+
+3. On the Security-Desk VM, run the following command as the "playerone" user within that user's home directory (/home/playerone)...
+python2 heartbleed.py dump devweb.daswebs.com
+
+This will create a file called out.txt in playerone's home directory (/home/playerone/out.txt), which will contain memory retrieved by exploiting the vulnerability. You should see at least one of these two things: HTTP request parameters in clear text (which contain the credentials to log in), or an HTTP cookie that corresponds to the existing session. You can use these credentials to log in or replace the cookie in your browser with one found in the dump for access.
+
+> To look for and use credentials, look for strings resembling "username=___&password=___", where the blanks correspond to values for the form fields. With a session cleared, you can use these values to log in to the application.
+
+> To look for and use a cookie, look for a string in the dump that starts with "Cookie: PHPSESSID=...". The value following will be the value of the cookie. Navigate to https://devweb.daswebs.com:8443/profile.php. You should see a message stating that you are not authorized to view this page. Next, open the Developer Tools in Firefox and enter the following command into the console...
+document.cookie = "PHPSESSID=__________";
+making sure to replace the underscores with the cookie value you found. This will reuse the session and let you act as if you were the user who the session belonged to. Refresh the page and you should now see the profile page originally displayed after logging into the web application on Workstation-Desk.
+
+Note: This must be performed on a service you can access that is using OpenSSL. Other implementations of TLS are not affected.
+
